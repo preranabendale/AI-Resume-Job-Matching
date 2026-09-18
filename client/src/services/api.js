@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://ai-resume-job-matching-api.onrender.com",
+  baseURL: "https://ai-resume-job-matching-api.onrender.com/api",
 });
 
 API.interceptors.request.use(
