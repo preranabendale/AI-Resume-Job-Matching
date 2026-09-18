@@ -7,6 +7,7 @@ const register = async (req, res) => {
   try {
     const { fullName, email, password, role } = req.body;
 
+    // Check required fields
     if (!fullName || !email || !password || !role) {
       return res.status(400).json({
         success: false,
@@ -14,8 +15,19 @@ const register = async (req, res) => {
       });
     }
 
+    // Validate role
+    if (!["seeker", "recruiter"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check existing user
     const existingUser = await User.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
     });
 
     if (existingUser) {
@@ -25,29 +37,38 @@ const register = async (req, res) => {
       });
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create user
     const user = await User.create({
-      fullName,
-      email: email.toLowerCase().trim(),
+      fullName: fullName.trim(),
+      email: normalizedEmail,
       password: hashedPassword,
       role,
     });
 
-    console.log("Registered User:", user);
+    console.log("User registered successfully:", user._id);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "User Registered Successfully",
-      user,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+      },
     });
-
   } catch (error) {
-    console.log("Register Error:", error);
+    console.log("========== REGISTER ERROR ==========");
+    console.log(error);
+    console.log("====================================");
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: "Registration failed",
+      error: error.message,
     });
   }
 };
@@ -57,6 +78,7 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Check required fields
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -64,18 +86,12 @@ const login = async (req, res) => {
       });
     }
 
-    console.log("Login Email:", email);
-
-    // Show all users
-    const allUsers = await User.find();
-    console.log("All Users:", allUsers);
+    const normalizedEmail = email.toLowerCase().trim();
 
     // Find user
     const user = await User.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
     });
-
-    console.log("Found User:", user);
 
     if (!user) {
       return res.status(404).json({
@@ -84,9 +100,8 @@ const login = async (req, res) => {
       });
     }
 
+    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
-
-    console.log("Password Match:", isMatch);
 
     if (!isMatch) {
       return res.status(401).json({
@@ -95,8 +110,17 @@ const login = async (req, res) => {
       });
     }
 
-    console.log("JWT Secret:", process.env.JWT_SECRET);
+    // Check JWT secret
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is missing");
 
+      return res.status(500).json({
+        success: false,
+        message: "JWT configuration is missing on server",
+      });
+    }
+
+    // Generate JWT
     const token = jwt.sign(
       {
         id: user._id,
@@ -108,9 +132,9 @@ const login = async (req, res) => {
       }
     );
 
-    console.log("Generated Token:", token);
+    console.log("Login successful:", user.email);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Login Successful",
       token,
@@ -121,13 +145,15 @@ const login = async (req, res) => {
         role: user.role,
       },
     });
-
   } catch (error) {
-    console.log("Login Error:", error);
+    console.log("========== LOGIN ERROR ==========");
+    console.log(error);
+    console.log("=================================");
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: "Login failed",
+      error: error.message,
     });
   }
 };
